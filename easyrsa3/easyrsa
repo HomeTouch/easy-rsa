@@ -582,6 +582,22 @@ Run easyrsa without commands for usage and commands."
 	[ ! "$EASYRSA_BATCH" ] && EASYRSA_REQ_CN="$1"
 	shift
 
+	PASSWORD=""
+	if [ -z "$2" ]; then
+		PASSWORD=""
+	else
+		data=$2
+		start=${data%:*}
+		end=${data##*:}
+		if [ "$start" = "pass" ]
+		then
+			PASSWORD="-passin $data -passout $data"
+		else
+			PASSWORD=""
+			warn "[gen_req] The second argument should be pass:<PASSWORD>: '$2'"
+		fi
+	fi
+
 	# function opts support
 	opts=
 	while [ -n "$1" ]; do
@@ -634,7 +650,7 @@ $EASYRSA_EXTRA_EXTS"
 	# generate request
 	[ $EASYRSA_BATCH ] && opts="$opts -batch"
 	# shellcheck disable=SC2086
-	"$EASYRSA_OPENSSL" req -utf8 -new -newkey "$EASYRSA_ALGO":"$EASYRSA_ALGO_PARAMS" \
+	"$EASYRSA_OPENSSL" req $PASSWORD -utf8 -new -newkey "$EASYRSA_ALGO":"$EASYRSA_ALGO_PARAMS" \
 		-config "$EASYRSA_SAFE_CONF" -keyout "$key_out_tmp" -out "$req_out_tmp" $opts \
 		|| die "Failed to generate request"
 	mv "$key_out_tmp" "$key_out"; EASYRSA_TEMP_FILE_2=
@@ -781,7 +797,17 @@ Run easyrsa without commands for usage and commands."
 	while [ -n "$1" ]; do
 		case "$1" in
 			nopass) req_opts="$req_opts nopass" ;;
-			*) warn "Ignoring unknown command option: '$1'" ;;
+			*) 
+				data=$1
+				start=${data%:*}
+				end=${data##*:}
+				if [ "$start" = "pass" ]
+				then
+					req_opts="$req_opts $1"
+				else
+					warn "[build_full] Ignoring unknown command option: '$1'"
+				fi
+				;;
 		esac
 		shift
 	done
